@@ -15,7 +15,6 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d
       - ./nginx/logs:/var/log/nginx/
     depends_on:
-      - php-7.4
       - php-8.0
       - mysql-8
       - mysql-5.7
@@ -106,7 +105,7 @@ services:
     working_dir: /var/www
     container_name: php-8.0
     volumes:
-      - ./.ssh:/home/phpdev/.ssh
+      - ./.ssh:/home/USER/.ssh
       - ./projects:/var/www
       - ./php-ini/8.0/php.ini:/usr/local/etc/php/php.ini
       - ./php-workers/8.0/supervisor.d:/etc/supervisor.d
@@ -114,28 +113,3 @@ services:
       - "${PHP_8_0_PORT}:9000"
     networks:
       - backend
-    extra_hosts:
-      - 'project-2.local:172.24.0.6'
-      - 'project-3.local:172.24.0.3'
-
-  php-7.4:
-    build:
-      context: php-7-workspace
-      dockerfile: Dockerfile
-      args:
-        DOCKER_PHP_VERSION: '7.4'
-        TZ: ${WORKSPACE_TIMEZONE}
-    working_dir: /var/www
-    container_name: php-7.4
-    volumes:
-      - ./.ssh:/home/phpdev/.ssh
-      - ./projects:/var/www
-      - ./php-ini/7.4/php.ini:/usr/local/etc/php/php.ini
-      - ./php-workers/7.4/supervisor.d:/etc/supervisor.d
-    ports:
-      - "${PHP_7_4_PORT}:9000"
-    networks:
-      - backend
-    extra_hosts:
-      - 'project-2.local:172.24.0.6'
-      - 'project-3.local:172.24.0.3'

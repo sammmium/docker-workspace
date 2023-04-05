@@ -1,6 +1,7 @@
 # Среда разработки PHP на базе Docker
 
-Публикация на **Habr**: https://habr.com/ru/post/519500/.
+Основано на публикации на **Habr**: https://habr.com/ru/post/519500/,
+а также на репозитории на **GitHub**: https://github.com/drandin/docker-php-workspace?ref=vc.ru.
 
 - [Требования](#Требования)
 - [Возможности](#Возможности-и-особенности)
@@ -17,15 +18,13 @@
 
 ## Возможности и особенности
 
-- Несколько версий **PHP** — **7.4**, **8.0** с набором наиболее востребованных расширений. 
-- Возможность использовать для web-проектов разные версии **PHP**.
+- Версия **PHP 8.0** с набором необходимых расширений.
 - Готовый к работе монитор процессов **Supervisor**.
 - Предварительно сконфигурированный веб-сервер **Nginx**.
 - Базы данных:
   - **MySQL 5.7**.
   - **MySQL 8**.
   - **PostgreSQL** (latest).
-  - **MongoDB 4.2**.
   - **Redis** (latest).
 - Настройка основных параметров окружения через файл **.env**.
 - Возможность модификации сервисов через **docker-compose.yml**.
@@ -46,13 +45,11 @@
 ├── .ssh
 ├── README.md
 ├── docker-compose.yml
-├── mongo
 ├── mysql-5.7
 ├── mysql-8
 ├── nginx
 ├── php-ini
 ├── php-workers
-├── php-7-workspace
 ├── php-8-workspace
 ├── postgres
 ├── projects
@@ -72,9 +69,6 @@
 ```dotenv
 # Временная зона
 WORKSPACE_TIMEZONE='Europe/Moscow'
-
-# XDEBUG
-DOCKER_PHP_ENABLE_XDEBUG='on'
 
 # Настройки Nginx
 # Порт, который следует использовать
@@ -106,22 +100,9 @@ MYSQL_8_PORT=4308
 # для соединения с локального компьютера
 MYSQL_5_7_PORT=4307
 
-# Настройки MongoDB
-# Порт, который следует использовать
-# для соединения с локального компьютера
-MONGO_PORT=27017
-
 # Настройки PHP 8.0
 # Внешний порт, доступен с локального компьютера
 PHP_8_0_PORT=9006
-
-# Настройки PHP 7.3
-# Внешний порт, доступен с локального компьютера
-PHP_7_3_PORT=9003
-
-# Настройки PHP 7.1
-# Внешний порт, доступен с локального компьютера
-PHP_7_1_PORT=9001
 ```
 
 ### .gitignore
@@ -140,23 +121,6 @@ PHP_7_1_PORT=9001
 
 Документ в формате YML, в котором определены правила создания и запуска многоконтейнерных приложений Docker. 
 В этом файле описана структура среды разработки и некоторые параметры необходимые для корректной работы web-приложений.
-
-### mongo
-
-Каталог базы данных MongoDB.
-
-```
-├── configdb
-│   └── mongo.conf
-├── db
-└── dump
-```
-
-**mongo.conf** — Файл конфигурации MongoDB. В этот файл можно добавлять параметры, которые при перезапуске MongoDB будут применены.
-
-**db** — эта папка предназначена для хранения пользовательских данных MongoDB.
-
-**dump** — каталог для хранения дампов.  
  
 ### mysql-5.7
 
@@ -223,7 +187,7 @@ server {
     server_name project-1.localhost;
     error_log /var/log/nginx/project-1.error.log;
     access_log /var/log/nginx/project-1.access.log combined if=$loggable;
-    root /var/www/project-1.ru;
+    root /var/www/project-1;
 
     location / {
         try_files $uri $uri/ /index.php?$query_string;
@@ -232,30 +196,7 @@ server {
     location ~ \.php$ {
         try_files $uri =404;
         fastcgi_split_path_info ^(.+\.php)(/.+)$;
-        fastcgi_pass php-7.3:9000;
-        fastcgi_index index.php;
-        include fastcgi_params;
-        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-        fastcgi_param PATH_INFO $fastcgi_script_name;
-    }
-}
-
-server {
-    listen 80;
-    index index.php index.html;
-    server_name project-2.localhost;
-    error_log /var/log/nginx/project-2.error.log;
-    access_log /var/log/nginx/project-2.access.log combined if=$loggable;
-    root /var/www/project-2.ru;
-
-    location / {
-        try_files $uri $uri/ /index.php?$query_string;
-    }
-
-    location ~ \.php$ {
-        try_files $uri =404;
-        fastcgi_split_path_info ^(.+\.php)(/.+)$;
-        fastcgi_pass php-7.1:9000;
+        fastcgi_pass php-8.0:9000;
         fastcgi_index index.php;
         include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
@@ -264,27 +205,27 @@ server {
 }
 ```
 
-В файле конфигурации описаны настройки для 2 web-проектов — **project-1.localhost** и **project-2.localhost**.
+**project-1** наименование директории проекта (располагается непосредственно в директории **/projects** на локальной машине, что соотвествует **/var/www** внутри контейнера). Иногда он располагается не в корне проекта, а внутри директории **/public** и в таком случае нужно указать например: /project-1/public.
+
+В файле конфигурации описаны настройки для web-проекта — **project-1.localhost**.
 
 Здесь следует обратить внимание на то, как производится перенаправление запросов к нужному docker-контейнеру.
 
 Например, для проекта **project-1.localhost** указано:
 
 ```nginx
-fastcgi_pass php-7.3:9000;
+fastcgi_pass php-8.0:9000;
 ```
 
-**php-7.3** — название docker-контейнера, а **9000** — порт внутренней сети. Контейнеры между собой связаны через внутреннюю сеть, которая определена в файле **docker-compose.yml**.  
+**php-8.0** — название docker-контейнера, а **9000** — порт внутренней сети. Контейнеры между собой связаны через внутреннюю сеть, которая определена в файле **docker-compose.yml**.  
   
 ### php-ini
 
-В этом каталоге находятся файлы конфигурации PHP.
+В этом каталоге будут находится файлы конфигурации PHP.
 
 ```
-├── 7.1
-│   └── php.ini
-└── 7.3
-    └── php.ini
+└── 8.0
+    └── php.ini
 ```
 Для каждой версии PHP — свой файл конфигурации.
 
@@ -293,11 +234,8 @@ fastcgi_pass php-7.3:9000;
 
 Место для хранения файлов конфигурации **Supervisor**.
 
-```
-├── 7.1
-│   └── supervisor.d
-│       
-└── 7.3
+```     
+└── 8.0
     └── supervisor.d
 ```
 
@@ -336,14 +274,14 @@ fastcgi_pass php-7.3:9000;
 Например:
 
 ```
-project-1.ru
-project-2.ru 
+project-1
+project-2 
 ...
 ```
 
-Содержимое каталога **projects** доступно из контейнеров **php-7.1** и **php-7.3**. 
+Содержимое каталога **projects** доступно из контейнера **php-8.0**. 
 
-Если зайти в контейнер **php-7.1** или **php-7.3**, то в каталоге **/var/www** будут доступны проекты, которые расположены в **projects** на локальной машине.
+Если зайти в контейнер **php-8.0**, то в каталоге **/var/www** будут доступны проекты, которые расположены в **projects** на локальной машине.
 
 ### redis
 
@@ -407,14 +345,13 @@ cp .env-example .env
 
 <br>
 
-Для примера, далее мы будем исходить из предположения, что у вас есть 2 проекта:
+Для примера, далее мы будем исходить из предположения, что у вас есть проект:
 
 ```
-project-1.ru
-project-2.ru
+project-1
 ```
 
-**project-1.ru** — будет работать на версии PHP 7.3, **project-2.ru** - на PHP 7.1, а **project-3.ru** - на PHP 8.0.
+**project-1** — будет работать на версии PHP 8.0.
 
 **4**. Отредактируйте настройки виртуальных хостов **Nginx**.
 
@@ -445,6 +382,7 @@ project-2.ru
 
 **6**. _[опционально]_ Настройте маршрутизацию внутри контейнеров web-проектов.
 
+Данный раздел нужен только лишь, если на сервере будут развернуты несколько проектов, которые должны быть связаны между собой.
 Web-проекты должны иметь возможность отправлять http-запросы друг другу и использовать для этого название хостов. 
 
 Из одного запущенного docker-контейнера **php-7.1** web-приложение №1 должно иметь возможность отправить запрос к другому web-приложению №2, которое работает внутри docker-контейнера **php-7.3**. При этом адресом запроса может быть название хоста, которое указано в файле **/etc/hosts** локального компьютера. 
@@ -474,6 +412,10 @@ Web-проекты должны иметь возможность отправл
 
 ```shell script
 docker run -it alpine ping docker.for.mac.localhost
+
+или
+
+docker inspect php-8.0 | grep IPAddress
 ```
 
 В результате вы получите, что-то подобное:
@@ -483,9 +425,15 @@ PING docker.for.mac.localhost (192.168.65.2): 56 data bytes
 64 bytes from 192.168.65.2: seq=0 ttl=37 time=0.286 ms
 64 bytes from 192.168.65.2: seq=1 ttl=37 time=0.504 ms
 64 bytes from 192.168.65.2: seq=2 ttl=37 time=0.801 ms
+
+или
+
+            "SecondaryIPAddresses": null,
+            "IPAddress": "",
+                    "IPAddress": "192.168.65.2",
 ```
  
-После того, как вам станет известен IP-адрес, укажите его в секции **extra_hosts** в описание сервисов **php-7.1** **php-7.3** в **docker-compose.yml**.
+После того, как вам станет известен IP-адрес, укажите его в секции **extra_hosts** в описание сервисов **php-8.0** в **docker-compose.yml**.
   
 ```
   ...  
@@ -503,7 +451,7 @@ PING docker.for.mac.localhost (192.168.65.2): 56 data bytes
 
 **Хосты и порты сервисов**
 
-Для того, чтобы настроить соединения с базами данных из docker-контейнеров **php-7.1** и **php-7.3** следует использовать следующие названия хостов и порты:
+Для того, чтобы настроить соединения с базами данных из docker-контейнеров **php-8.0** следует использовать следующие названия хостов и порты:
 
 | Сервис     | Название хоста | Порт  |
 |------------|----------------|-------|
@@ -538,6 +486,15 @@ docker-compose build && docker-compose up -d
 
 Для работы web-проектов могут потребоваться SSH-ключи, например для того, чтобы из контейнера при помощи **Composer** можно было установить пакет из приватного репозитория.
 
+В принципе, если клюи уже созданы, то они уже будут проброшены в контейнер
+```
+php-8.0:
+    ...
+    volumes:
+      - ./.ssh:/home/USER/.ssh
+```
+Где USER нужно заменить на имя пользователя в системе линукс.
+
 Создать SSH-ключи можно при помощи следующей команды:
 
 ```shell script
@@ -569,13 +526,10 @@ docker ps
   
 ```
 CONTAINER ID        IMAGE                          COMMAND                  CREATED             STATUS              PORTS                               NAMES
-8d348959c475        docker-php-workspace_php-7.1   "docker-php-entrypoi…"   6 minuts ago        Up 54 seconds       0.0.0.0:9001->9000/tcp              php-7.1
-a93399727ff6        docker-php-workspace_php-7.3   "docker-php-entrypoi…"   6 minuts ago        Up 53 seconds       0.0.0.0:9003->9000/tcp              php-7.3
 7d879f796fdc        docker-php-workspace_php-8.0   "docker-php-entrypoi…"   6 minuts ago        Up 52 seconds
 5cd80ac95388        nginx:stable-alpine            "/docker-entrypoint.…"   6 minuts ago        Up 51 seconds       0.0.0.0:80->80/tcp                  nginx
 70182bc9e44c        mysql:5.7                      "docker-entrypoint.s…"   6 minuts ago        Up 54 seconds       33060/tcp, 0.0.0.0:4307->3306/tcp   mysql-5.7
 46f2766ec0b9        mysql:8.0.21                   "docker-entrypoint.s…"   6 minuts ago        Up 53 seconds       33060/tcp, 0.0.0.0:4308->3306/tcp   mysql-8
-a59e7f4b3c61        mongo:4.2                      "docker-entrypoint.s…"   6 minuts ago        Up 54 seconds       0.0.0.0:27017->27017/tcp            mongo
 eae8d62ac66e        postgres:alpine                "docker-entrypoint.s…"   6 minuts ago        Up 53 seconds       0.0.0.0:54322->5432/tcp             postgres
 bba24e86778a        redis:latest                   "docker-entrypoint.s…"   6 minuts ago        Up 54 seconds       0.0.0.0:6379->6379/tcp              redis
 ```  
@@ -586,21 +540,9 @@ bba24e86778a        redis:latest                   "docker-entrypoint.s…"   6 
 
 Если для работы web-приложений необходимо установить зависимости, например через менеджер пакетов **Composer** или **NPM**, то сейчас самое время сделать это.
 
-В контейнерах **php-7.1**, **php-7.3** и **php-8.0** уже установлен и **Composer** и **NPM**.
+В контейнере **php-8.0** уже установлен и **Composer** и **NPM**.
 
-Войдите в контейнер **php-7.1**:
-
-```shell script
-docker exec -it php-7.1 bash  
-```
-
-или
-
-```shell script
-docker exec -it php-7.3 bash  
-```
-
-или
+Войдите в контейнер **php-8.0**:
 
 ```shell script
 docker exec -it php-8.0 bash  
@@ -626,13 +568,15 @@ composer install
 docker exec -it container_name bash  
 ```
 
-**container_name** — имя контейнера.
+**container_name** — имя контейнера. Не все впускают...
 
-### Как останавливать и удалить контейнеры и другие ресурсы среды разработки, которые были созданы?
+### Как останавливать и удалять контейнеры и другие ресурсы среды разработки, которые были созданы?
 
 ```shell script
 docker-compose down
 ```
+
+Файлы проекта(ов) из пробрасываемых в контейнер директорий останутся на месте.
 
 ### Как получить список всех контейнеров?
 
@@ -648,7 +592,7 @@ docker inspect container_name
 
 **container_name** — имя контейнера.
 
-### Как узнать какие расширения PHP установлены в контейнере php-7.3?
+### Как узнать какие расширения PHP установлены в контейнере php-8.0?
 
 Если контейнер **php-8.0** запущен, то выполните команду:
 
